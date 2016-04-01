@@ -31,7 +31,7 @@ class Instance:
             self.instance_id = instance_id
             self.raw = json.loads(subprocess.check_output(["aws", "ec2", "describe-instances", "--instance-id", instance_id]).decode("utf-8"))["Reservations"][0]["Instances"][0]
         self.cheapskate = {
-            "grp": "0",
+            "grp": "1",
             "user": "",
             "off": "",
             "req": ""
@@ -65,12 +65,12 @@ class Instance:
         for instance in cls.objects:
             try:
                 if dt.strptime(instance.cheapskate["off"], Instance.DATEFORMAT) < dt.now():
-                    print(instance.instance_id)
-                    print(instance.cheapskate["user"])
+                    results.append(instance)
             except ValueError:
                 pass
+        return results
 
-    def update(self, grp=None, user=None, off=None, req=None):
+    def update(self, user=None, off=None, req=None, grp=None):
         if grp:
             self.cheapskate["grp"] = grp
         if user:
@@ -80,6 +80,11 @@ class Instance:
         if req:
             self.cheapskate["req"] = req
         self.save()
+
+    def shutdown(self):
+        if self.cheapskate["grp"] != 1:
+            pass
+            #subprocess.check_output(["aws", "ec2", "stop-instance", "--instance-id", self.instance_id])
 
     def __str__(self):
         return "{} ({})".format(self.raw["InstanceId"], [a for a in self.raw["Tags"] if a["Key"] == "Name"][0]["Value"])
