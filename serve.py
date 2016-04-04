@@ -14,26 +14,60 @@ form_template = '''
 '''
 
 main_template = '''
+    <h3>List of Instances and their status</h3>
+    </ hr>
     <table>
-    %for instance in instances:
         <tr>
+            <th>Instance ID</th>
+            <th>Off Date</th>
+            <th>User</th>
+            <th>Requested Off Date</th>
+            <th>Group</th>
+        <tr>
+    %index = 0
+    %for instance in inst:
+        <tr>
+            <td><a href="/{{ index }}">{{ instance.instance_id }}</a></td>
             <td>{{ instance.cheapskate["off"] }}</td>
             <td>{{ instance.cheapskate["user"] }}</td>
             <td>{{ instance.cheapskate["req"] }}</td>
-            <td>{{ instance.cheapskate["grp"] }}</td>
+            <td>{{ instance.GROUPS[instance.cheapskate["grp"]] }}</td>
         </tr>
+        %index += 1
     %end
     </table>
 '''
 
+inst_template = '''
+    <table>
+        <tr>
+            <th>Instance ID</th>
+            <th>Off Date</th>
+            <th>User</th>
+            <th>Requested Off Date</th>
+            <th>Group</th>
+        <tr>
+        <tr>
+            <td>{{ instance.instance_id }}</td>
+            <td>{{ instance.cheapskate["off"] }}</td>
+            <td>{{ instance.cheapskate["user"] }}</td>
+            <td>{{ instance.cheapskate["req"] }}</td>
+            <td>{{ instance.GROUPS[instance.cheapskate["grp"]] }}</td>
+        </tr>
+    </table>
+'''
 
 @route('/')
 def home_page():
-    inst = Instance.Objects()
-    main = template(main_template, inst)
+    page = template(main_template, inst=Instance.objects)
 
-    return main
+    return page
 
+@route('/<index>')
+def inst_page(index):
+    page = template(inst_template, instance=Instance.objects[int(index)])
+
+    return page
 
 # @route('/ec2/<name>')
 # def ec2_instance(name):
@@ -65,4 +99,4 @@ def home_page():
 #             #return template('<b>Instance {{name}} failed to start.</b>', name=name)
 #     return template('<b>{{name}} is running.</b>', name=name)
 
-run(host='0.0.0.0', port=8001)
+run(host='0.0.0.0', port=8001, reloader=True)
