@@ -3,6 +3,7 @@ from bottle import route, run, template, request
 import subprocess
 import requests
 import json
+import os
 from cheapskate import Instance
 
 form_template = '''
@@ -58,16 +59,32 @@ inst_template = '''
 '''
 
 @route('/')
-def home_page():
-    page = template(main_template, inst=Instance.objects)
+def home():
+    return """
+<html><body>
+<p>GET <a href="/api/ec2_instance">/api/ec2_instance</a> - EC2 instances as json</p>
+<p>GET /api/ec2_instance/<instance_id> - Single EC2 instance as json</p>
+<p>POST /api/ec2_instance/<instance_id> - Update Single EC2 instance json</p>
+</body></html>
+"""
 
-    return page
+@route('/api/ec2_instance')
+def ec2_instances():
+    return json.dumps(Instance.objects_dict())
 
-@route('/<index>')
-def inst_page(index):
-    page = template(inst_template, instance=Instance.objects[int(index)])
+@route('/api/ec2_instance/<instance_id>')
+def ec2_instance(instance_id):
+    return json.dumps(Instance.objects_dict()[instance_id])
 
-    return page
+@route('/api/ec2_instance/<instance_id>', method='POST')
+def ec2_instance_update(instance_id):
+    instance = Instance.objects()[instance_id]
+    instance.cheapskate["req"] = request.json["req"]
+    instance.cheapskate["user"] = request.headers["REMOTE_USER"]
+    instance.save()
+    return json.dumps(instance.__dict__())
+
+
 
 # @route('/ec2/<name>')
 # def ec2_instance(name):
@@ -98,5 +115,17 @@ def inst_page(index):
 #             return e
 #             #return template('<b>Instance {{name}} failed to start.</b>', name=name)
 #     return template('<b>{{name}} is running.</b>', name=name)
+
+if True or not os.path.exists("ec2prices.json"):
+    ec2pricedata = json.load(open("ec2prices2.json"))
+    with open("ec2prices.json", "w") as ec2:
+        #priceurl = "https://pricing.us-east-1.amazonaws.com"
+        #offers = requests.get(priceurl + "/offers/v1.0/aws/index.json").content.decode("utf-8")
+        #ec2priceurl = priceurl + json.loads(offers)["offers"]["AmazonEC2"]["currentVersionUrl"]
+        #ec2pricedata = requests.get(ec2priceurl).content.decode("utf-8")
+        region_prices = [product for key, product in ec2pricedata['products'].items() if product["attributes"].get("location") == "Asia Pacific (Sydney)"]
+        for product in region_prices:
+            product["attributes"]["terms"] = ec2pricedata["terms"]["OnDemand"][product["sku"]]
+        ec2.write(json.dumps(region_prices))
 
 run(host='0.0.0.0', port=8001, reloader=True)
