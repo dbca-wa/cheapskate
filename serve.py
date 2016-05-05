@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from bottle import route, run, template, request
+from bottle import route, run, template, request, default_app
 import subprocess
 import requests
 import json
@@ -61,4 +61,4 @@ def ec2_instance_update(instance_id):
     instance.update(user=user, hours=int(hours))
     return json.dumps(instance.__dict__())
 
-run(host='0.0.0.0', port=8001, reloader=True)
+application = default_app()

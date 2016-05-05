@@ -3,6 +3,8 @@ import subprocess
 import json
 from datetime import datetime as dt, timedelta
 from jsonpath_rw import parse
+import uwsgi
+import pickle
 
 
 class Instance:
@@ -42,19 +44,24 @@ class Instance:
     def save(self):
         cheapskate_raw = "/".join([key + "=" + value for key, value in self.cheapskate.items() if key in Instance.CHEAPSKATE.keys()])
         subprocess.check_output(["aws", "ec2", "create-tags", "--resources", self.instance_id, "--tags", 'Key=cheapskate,Value="{}"'.format(cheapskate_raw)])
+        uwsgi.cache_del("raw_aws")
 
     @classmethod
     def objects(cls):
-        if not hasattr(cls, "_objects") or dt.now() - cls._updated > timedelta(minutes=15):
-            raw = json.loads(subprocess.check_output(["aws", "ec2", "describe-instances", "--no-paginate"]).decode("utf-8"))
-            objects = {}
-            for data in raw["Reservations"]:
-                for instance_data in data["Instances"]:
-                    instance = Instance(instance_data=instance_data)
-                    objects[instance.instance_id] = instance
-            cls._objects = objects
-            cls._updated = dt.now()
-        return cls._objects
+        if not uwsgi.cache_exists("raw_aws"):
+            if hasattr(cls, "_objects"):
+                del cls._objects
+            uwsgi.cache_set("raw_aws", subprocess.check_output(["aws", "ec2", "describe-instances", "--no-paginate"]), 60*15)
+        raw = json.loads(uwsgi.cache_get("raw_aws").decode("utf-8"))
+        if hasattr(cls, "_objects"):
+            return cls._objects
+        objects = {}
+        for data in raw["Reservations"]:
+            for instance_data in data["Instances"]:
+                instance = Instance(instance_data=instance_data)
+                objects[instance.instance_id] = instance
+        cls._objects = objects
+        return objects
 
     @classmethod
     def objects_list(cls):
