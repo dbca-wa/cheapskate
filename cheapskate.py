@@ -2,6 +2,7 @@
 import subprocess
 import json
 from datetime import datetime as dt, timedelta
+from jsonpath_rw import parse
 
 
 class Instance:
@@ -17,14 +18,11 @@ class Instance:
 
     DATEFORMAT = '%Y-%m-%dT%H:%M'
     CHEAPSKATE = { "grp": "1", "user": "", "off": "", "req": "" }
+    PRODUCTS = json.load(open("ec2prices.json"))
 
-    def __init__(self, instance_id=None, instance_data=None):
-        if "InstanceId" in instance_data:
-            self.instance_id = instance_data["InstanceId"]
-            self.raw = instance_data
-        else:
-            self.instance_id = instance_id
-            self.raw = json.loads(subprocess.check_output(["aws", "ec2", "describe-instances", "--instance-id", instance_id]).decode("utf-8"))["Reservations"][0]["Instances"][0]
+    def __init__(self, instance_data):
+        self.instance_id = instance_data["InstanceId"]
+        self.raw = instance_data
         self.cheapskate = Instance.CHEAPSKATE.copy()
         self.name = ""
         if "cheapskate" in [a["Key"] for a in self.raw["Tags"]]:
@@ -32,35 +30,45 @@ class Instance:
             self.cheapskate.update(dict([a.split("=") for a in cheapskate_raw.split("/")]))
         if "Name" in [a["Key"] for a in self.raw["Tags"]]:
             self.name = [a for a in self.raw["Tags"] if a["Key"] == "Name"][0]["Value"].strip()
+        product_key = self.raw["InstanceType"] + "." + self.raw.get("Platform", "linux").title()
+        self.product = Instance.PRODUCTS[product_key]
+        pricedims = parse("terms.*.priceDimensions.*").find(self.product)
+        if not pricedims:
+            pricedims = parse("terms").find(self.product)
+        pricedims = pricedims[0].value
+        self.price = pricedims["pricePerUnit"]["USD"]
+        self.product["terms"] = pricedims
 
     def save(self):
         cheapskate_raw = "/".join([key + "=" + value for key, value in self.cheapskate.items() if key in Instance.CHEAPSKATE.keys()])
-        print(subprocess.check_output(["aws", "ec2", "create-tags", "--resources", self.instance_id, "--tags", 'Key=cheapskate,Value="{}"'.format(cheapskate_raw)]))
+        subprocess.check_output(["aws", "ec2", "create-tags", "--resources", self.instance_id, "--tags", 'Key=cheapskate,Value="{}"'.format(cheapskate_raw)])
 
     @classmethod
     def objects(cls):
         if not hasattr(cls, "_objects") or dt.now() - cls._updated > timedelta(minutes=15):
-            raw = json.loads(subprocess.check_output(["aws", "ec2", "describe-instances"]).decode("utf-8"))
+            raw = json.loads(subprocess.check_output(["aws", "ec2", "describe-instances", "--no-paginate"]).decode("utf-8"))
             objects = {}
             for data in raw["Reservations"]:
-                instance = Instance(instance_data=data["Instances"][0])
-                objects[instance.instance_id] = instance
+                for instance_data in data["Instances"]:
+                    instance = Instance(instance_data=instance_data)
+                    objects[instance.instance_id] = instance
             cls._objects = objects
             cls._updated = dt.now()
         return cls._objects
 
     @classmethod
-    def objects_dict(cls):
-        objdict = {}
-        for key, instance in cls.objects().items():
-            objdict[key] = instance.__dict__()
-        return objdict
+    def objects_list(cls):
+        return [i.__dict__() for i in cls.objects().values()]
 
     def __dict__(self):
         data = self.cheapskate
         data["name"] = self.name
+        data["id"] = self.instance_id
+        data["status"] = self.raw["State"]["Name"]
         data["type"] = self.raw["InstanceType"]
         data["launchtime"] = self.raw["LaunchTime"]
+        data["hourlycost"] = self.price
+        data["product"] = self.product
         return data
 
     @classmethod
@@ -79,17 +87,16 @@ class Instance:
                 pass
         return results
 
-    def update(self, user=None, off=None, req=None, grp=None):
-        if grp:
-            self.cheapskate["grp"] = grp
-        if user:
-            self.cheapskate["user"] = user
-        if off:
-            self.cheapskate["off"] = off
-        if req:
-            self.cheapskate["req"] = req
+    def update(self, user, hours):
+        self.cheapskate["user"] = user
+        self.cheapskate["req"] = dt.strftime(dt.now() + timedelta(hours=hours), Instance.DATEFORMAT)
+        # TODO: check hours/req meets approval
+        self.start()
         self.save()
 
+    def start(self):
+        return subprocess.check_output(["aws", "ec2", "start-instances", "--instance-ids", self.instance_id])
+    
     def shutdown(self):
         if self.cheapskate["grp"] != 1:
             pass
