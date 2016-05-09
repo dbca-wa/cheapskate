@@ -73,8 +73,8 @@ class Instance:
         data["id"] = self.instance_id
         data["status"] = self.raw["State"]["Name"]
         data["type"] = self.raw["InstanceType"]
-        data["launchtime"] = self.raw["LaunchTime"]
-        data["hourlycost"] = self.price
+        data["launchtime"] = dt.strftime(dt.strptime(self.raw["LaunchTime"], Instance.DATEFORMAT + ":%S.%fZ"), Instance.DATEFORMAT)
+        data["hourlycost"] = "%.3f"%float(self.price)
         data["product"] = self.product
         return data
 
