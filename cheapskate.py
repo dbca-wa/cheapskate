@@ -21,6 +21,7 @@ class Instance:
     DATEFORMAT = '%Y-%m-%dT%H:%M'
     CHEAPSKATE = { "grp": "1", "user": "", "off": "", "req": "" }
     PRODUCTS = json.load(open("ec2prices.json"))
+    COSTTHRESHOLD = 20
 
     def __init__(self, instance_data):
         self.instance_id = instance_data["InstanceId"]
@@ -80,16 +81,16 @@ class Instance:
 
     @classmethod
     def save_all(cls):
-        for instance in cls.objects():
+        for instanceid, instance in cls.objects().items():
             instance.save()
 
     @classmethod
     def shutdown_due(cls, hours=0):
-        results = []
-        for instance in cls.objects():
+        results = {}
+        for instanceid, instance in cls.objects().items():
             try:
-                if dt.strptime(instance.cheapskate["off"], Instance.DATEFORMAT) < dt.now():
-                    results.append(instance)
+                if dt.strptime(instance.cheapskate["off"], Instance.DATEFORMAT) < dt.now() + timedelta(hours=hours):
+                    results[instanceid] = instance
             except ValueError:
                 pass
         return results
@@ -97,7 +98,9 @@ class Instance:
     def update(self, user, hours):
         self.cheapskate["user"] = user
         self.cheapskate["req"] = dt.strftime(dt.now() + timedelta(hours=hours), Instance.DATEFORMAT)
-        # TODO: check hours/req meets approval
+        if self.price * hours >= Instance.COSTTHRESHOLD:
+            self.cheapskate["off"] = dt.strftime(dt.now() + timedelta(hours=(Instance.COSTTHRESHOLD/self.price)), Instance.DATEFORMAT)
+            print (self.cheapskate["off"], self.cheapskate["req"])
         self.start()
         self.save()
 
@@ -105,9 +108,15 @@ class Instance:
         return subprocess.check_output(["aws", "ec2", "start-instances", "--instance-ids", self.instance_id])
     
     def shutdown(self):
-        if self.cheapskate["grp"] != 1:
+        if self.cheapskate["grp"] == 1:
+            return 0
+        elif self.cheapskate["grp"] == 2:
+            #Check if outside business hours then shut down
             pass
-            #subprocess.check_output(["aws", "ec2", "stop-instance", "--instance-id", self.instance_id])
+        else:
+            if dt.strptime(self.cheapskate["off"], Instance.DATEFORMAT) < dt.now():
+                #subprocess.check_output(["aws", "ec2", "stop-instances", "--instance-ids", self.instance_id])
+                pass
 
     def __str__(self):
         return "{} ({})".format(self.raw["InstanceId"], [a for a in self.raw["Tags"] if a["Key"] == "Name"][0]["Value"])

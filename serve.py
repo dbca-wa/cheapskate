@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
-from bottle import route, run, template, request, default_app
+from bottle import route, run, template, request, default_app, HTTPError
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import subprocess
 import requests
 import json
 import os
+import smtplib
+from operator import itemgetter
+
+ALLOWED_IPS = ["127.0.0.1"]
+DEBUG = True
 
 if not os.path.exists("ec2prices_raw.json"):
     priceurl = "https://pricing.us-east-1.amazonaws.com"
@@ -35,6 +42,13 @@ if not os.path.exists("ec2prices.json"):
 
 from cheapskate import Instance
 
+def check_cli_ip(route=""):
+    if DEBUG:
+        return
+    client_ip = request.environ.get('REMOTE_ADDR')
+    if client_ip not in ALLOWED_IPS:
+        raise HTTPError(404, "Not found: '{}'".format(route))
+
 @route('/')
 def home():
     return """
@@ -60,5 +74,71 @@ def ec2_instance_update(instance_id):
     user = request.headers.get("Remote-User")
     instance.update(user=user, hours=int(hours))
     return json.dumps(instance.__dict__())
+
+@route('/api/cli/shutdown_check')
+def cli_shudown_check():
+    check_cli_ip("/api/cli/shutdown_check")
+
+    with open("shutdown_due.json","w") as shut:
+        output = []
+        for instanceid, instance in Instance.shutdown_due(hours=3).items():
+            inst = instance.__dict__()
+            inst.pop("product", None)
+            output.append(inst)
+        shut.write(json.dumps(output, sort_keys=True, indent=4, separators=(',',': ')))
+    return "Shutdown file written" 
+
+@route('/api/cli/email_report')
+def cli_email_report():
+    check_cli_ip("/api/cli/email_report")
+
+    FROM = "cheapskate@dpaw.wa.gov.au"
+    TO = "brendan.cale@dpaw.wa.gov.au"
+    msg = MIMEMultipart('mixed')
+
+    msg['Subject'] = "Cheapskate shutdown report"
+    msg['From'] = FROM
+    msg['To'] = TO
+    body = "Instances to be turned off in the next 3 hours:\n"
+    body = body + "\nInstance ID\tShutdown Group\tShutdown time\t\tRequested time\t\tInstance Name\n"
+
+    instances = json.load(open("shutdown_due.json"))
+    if len(instances) == 0:
+        return "No shutdowns due"
+
+    instances = sorted(instances, key=itemgetter('off'))
+    for instance in instances:
+        body = body + "{}\t{}\t\t{}\t{}\t{}\n".format(instance["id"], Instance.GROUPS[instance["grp"]], instance["off"], instance["req"], instance["name"])
+    msg.attach(MIMEText(body))
+
+    s = smtplib.SMTP('alerts.corporateict.domain')
+    s.sendmail(FROM, TO, msg.as_string())
+    s.quit()
+
+    return "Email sent"
+
+@route('/api/cli/shutdown')
+def cli_shutdown():
+    check_cli_ip("/api/cli/shutdown")
+
+    instances = json.load(open("shutdown_due.json"))
+    if len(instances) == 0:
+        return "No shutdowns required"
+
+    for instance in instances:
+        Instance.objects()[instance["id"]].shutdown()
+
+    return "Shutdowns performed"
+
+@route('/api/cli/reset')
+def cli_reset():
+    check_cli_ip("/api/cli/reset")
+
+    for instanceid, instance in Instance.objects().items():
+        instance.cheapskate["grp"] = 1
+
+    Instance.save_all()
+
+    return "Instances reset"
 
 application = default_app()
