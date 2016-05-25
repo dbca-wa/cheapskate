@@ -22,6 +22,9 @@ class Instance:
     CHEAPSKATE = { "grp": "1", "user": "", "off": "", "req": "" }
     PRODUCTS = json.load(open("ec2prices.json"))
     COSTTHRESHOLD = 20
+    BUSINESSHOURSTART = '06:30'
+    BUSINESSHOUREND = '18:30'
+    BUSINESSDAYSOFWEEK = range(0,4) # Monday - Friday (range can be from 0-6)
 
     def __init__(self, instance_data):
         self.instance_id = instance_data["InstanceId"]
@@ -88,21 +91,29 @@ class Instance:
     def shutdown_due(cls, hours=0):
         results = {}
         for instanceid, instance in cls.objects().items():
-            try:
-                if dt.strptime(instance.cheapskate["off"], Instance.DATEFORMAT) < dt.now() + timedelta(hours=hours):
-                    results[instanceid] = instance
-            except ValueError:
-                pass
+            if instance.cheapskate["grp"] != 1:
+                try:
+                    if dt.strptime(instance.cheapskate["off"], Instance.DATEFORMAT) < dt.now() + timedelta(hours=hours):
+                        results[instanceid] = instance
+                except ValueError:
+                    pass
         return results
 
     def update(self, user, hours):
+        # Ensure that hours is not shorter than the current time.
+        reqtime = dt.now() + timedelta(hours=hours)
+        if reqtime < dt.strptime(self.cheapskate["off"], Instance.DATEFORMAT):
+            return 0
+        
         self.cheapskate["user"] = user
-        self.cheapskate["req"] = dt.strftime(dt.now() + timedelta(hours=hours), Instance.DATEFORMAT)
-        if self.price * hours >= Instance.COSTTHRESHOLD:
+        self.cheapskate["req"] = dt.strftime(reqtime, Instance.DATEFORMAT)
+        if float(self.price) * int(hours) >= float(Instance.COSTTHRESHOLD):
             self.cheapskate["off"] = dt.strftime(dt.now() + timedelta(hours=(Instance.COSTTHRESHOLD/self.price)), Instance.DATEFORMAT)
-            print (self.cheapskate["off"], self.cheapskate["req"])
+        else:
+            self.cheapskate["off"] = reqtime
         self.start()
         self.save()
+        return 1
 
     def start(self):
         return subprocess.check_output(["aws", "ec2", "start-instances", "--instance-ids", self.instance_id])
@@ -110,13 +121,13 @@ class Instance:
     def shutdown(self):
         if self.cheapskate["grp"] == 1:
             return 0
-        elif self.cheapskate["grp"] == 2:
-            #Check if outside business hours then shut down
-            pass
-        else:
+        elif self.cheapskate["grp"] == 0 or self.cheapskate[grp] == 2:
             if dt.strptime(self.cheapskate["off"], Instance.DATEFORMAT) < dt.now():
                 #subprocess.check_output(["aws", "ec2", "stop-instances", "--instance-ids", self.instance_id])
                 pass
+                return 1
+        else:
+            return -1
 
     def __str__(self):
         return "{} ({})".format(self.raw["InstanceId"], [a for a in self.raw["Tags"] if a["Key"] == "Name"][0]["Value"])

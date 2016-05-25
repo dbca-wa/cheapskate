@@ -8,6 +8,7 @@ import json
 import os
 import smtplib
 from operator import itemgetter
+from cheapskate import Instance
 
 ALLOWED_IPS = ["127.0.0.1"]
 DEBUG = True
@@ -40,7 +41,6 @@ if not os.path.exists("ec2prices.json"):
             output[product_key] = product["attributes"]
         ec2.write(json.dumps(output))
 
-from cheapskate import Instance
 
 def check_cli_ip(route=""):
     if DEBUG:
@@ -86,7 +86,7 @@ def cli_shudown_check():
             inst.pop("product", None)
             output.append(inst)
         shut.write(json.dumps(output, sort_keys=True, indent=4, separators=(',',': ')))
-    return "Shutdown file written" 
+    return "Shutdown file contains {} servers".format(len(output)) 
 
 @route('/api/cli/email_report')
 def cli_email_report():
@@ -133,9 +133,10 @@ def cli_shutdown():
 @route('/api/cli/reset')
 def cli_reset():
     check_cli_ip("/api/cli/reset")
+    return
 
     for instanceid, instance in Instance.objects().items():
-        instance.cheapskate["grp"] = 1
+        instance.cheapskate["grp"] = "1"
 
     Instance.save_all()
 
