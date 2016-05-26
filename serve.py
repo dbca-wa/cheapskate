@@ -120,20 +120,27 @@ def cli_email_report():
 @route('/api/cli/shutdown')
 def cli_shutdown():
     check_cli_ip("/api/cli/shutdown")
+    result = {}
 
     instances = json.load(open("shutdown_due.json"))
     if len(instances) == 0:
         return "No shutdowns required"
 
     for instance in instances:
-        Instance.objects()[instance["id"]].shutdown()
+        result[instance["id"]] = json.loads(Instance.objects()[instance["id"]].shutdown())
 
-    return "Shutdowns performed"
+    return result
+
+@route('/api/cli/start_business_hours')
+def cli_start_business_hours():
+    check_cli_ip("/api/cli/shutdown")
+
+    return Instance.start_business_hours()
 
 @route('/api/cli/reset')
 def cli_reset():
     check_cli_ip("/api/cli/reset")
-    return
+    return None
 
     for instanceid, instance in Instance.objects().items():
         instance.cheapskate["grp"] = "1"

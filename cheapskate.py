@@ -91,7 +91,7 @@ class Instance:
     def shutdown_due(cls, hours=0):
         results = {}
         for instanceid, instance in cls.objects().items():
-            if instance.cheapskate["grp"] != 1:
+            if instance.cheapskate["grp"] != "1" and instance.raw["State"]["Code"] == 16: # Code 16 is running
                 try:
                     if dt.strptime(instance.cheapskate["off"], Instance.DATEFORMAT) < dt.now() + timedelta(hours=hours):
                         results[instanceid] = instance
@@ -99,35 +99,58 @@ class Instance:
                     pass
         return results
 
-    def update(self, user, hours):
+    @classmethod
+    def start_business_hours(cls):
+        dtstart = dt.strptime(Instance.BUSINESSHOURSTART, "%H:%M")
+        dtend = dt.strptime(Instance.BUSINESSHOUREND, "%H:%M")
+        hours = (dtend - dtstart).seconds / 60 
+        
+        if dt.today().weekday() not in Instance.BUSINESSDAYSOFWEEK:
+            return False
+        if dt.now() < dtstart:
+            return False
+        if dt.now() > dtend:
+            return False
+       
+        for instanceid, instance in cls.objects().items():
+            if instance.cheapskate["grp"] != 2 and instance.raw["State"]["Code"] != "80": # Code 80 is stopped
+                return False
+            instance.update(user="Cheapskate", hours=hours, sysstart=1)
+        return "Instances started"
+
+    def update(self, user, hours, sysstart=0):
         # Ensure that hours is not shorter than the current time.
         reqtime = dt.now() + timedelta(hours=hours)
-        if reqtime < dt.strptime(self.cheapskate["off"], Instance.DATEFORMAT):
-            return 0
+        try:
+            if reqtime < dt.strptime(self.cheapskate["off"], Instance.DATEFORMAT):
+                return False
+        except ValueError:
+            print ("invalid date format: {}".format(self.cheapskate["off"]))
         
         self.cheapskate["user"] = user
         self.cheapskate["req"] = dt.strftime(reqtime, Instance.DATEFORMAT)
-        if float(self.price) * int(hours) >= float(Instance.COSTTHRESHOLD):
+        if sysstart == 0 and float(self.price) * int(hours) >= float(Instance.COSTTHRESHOLD):
             self.cheapskate["off"] = dt.strftime(dt.now() + timedelta(hours=(Instance.COSTTHRESHOLD/self.price)), Instance.DATEFORMAT)
         else:
-            self.cheapskate["off"] = reqtime
+            self.cheapskate["off"] = dt.strftime(reqtime, Instance.DATEFORMAT)
         self.start()
         self.save()
-        return 1
+        return True
 
     def start(self):
         return subprocess.check_output(["aws", "ec2", "start-instances", "--instance-ids", self.instance_id])
     
     def shutdown(self):
-        if self.cheapskate["grp"] == 1:
-            return 0
-        elif self.cheapskate["grp"] == 0 or self.cheapskate[grp] == 2:
+        if self.cheapskate["grp"] == "1":
+            return False
+        elif self.cheapskate["grp"] == "0" or self.cheapskate["grp"] == "2":
             if dt.strptime(self.cheapskate["off"], Instance.DATEFORMAT) < dt.now():
-                #subprocess.check_output(["aws", "ec2", "stop-instances", "--instance-ids", self.instance_id])
-                pass
-                return 1
+                print (self.__dict__())
+                result = subprocess.check_output(["aws", "ec2", "stop-instances", "--instance-ids", self.instance_id])
+                self.save()
+                return result
         else:
-            return -1
+            return None
 
     def __str__(self):
         return "{} ({})".format(self.raw["InstanceId"], [a for a in self.raw["Tags"] if a["Key"] == "Name"][0]["Value"])
