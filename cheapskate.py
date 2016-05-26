@@ -103,20 +103,23 @@ class Instance:
     def start_business_hours(cls):
         dtstart = dt.strptime(Instance.BUSINESSHOURSTART, "%H:%M")
         dtend = dt.strptime(Instance.BUSINESSHOUREND, "%H:%M")
-        hours = (dtend - dtstart).seconds / 60 
-        
+        hours = (dtend - dt.now()).seconds / 60 
+        print(hours)
+
         if dt.today().weekday() not in Instance.BUSINESSDAYSOFWEEK:
             return False
-        if dt.now() < dtstart:
+        if dt.now().time() < dtstart.time():
             return False
-        if dt.now() > dtend:
+        if dt.now().time() > dtend.time():
             return False
-       
+
+        results = []
         for instanceid, instance in cls.objects().items():
-            if instance.cheapskate["grp"] != 2 and instance.raw["State"]["Code"] != "80": # Code 80 is stopped
-                return False
+            if instance.cheapskate["grp"] != "2" or instance.raw["State"]["Code"] != "80": # Code 80 is stopped
+                continue
+            results.append(instanceid)
             instance.update(user="Cheapskate", hours=hours, sysstart=1)
-        return "Instances started"
+        return results
 
     def update(self, user, hours, sysstart=0):
         # Ensure that hours is not shorter than the current time.

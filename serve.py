@@ -135,7 +135,12 @@ def cli_shutdown():
 def cli_start_business_hours():
     check_cli_ip("/api/cli/shutdown")
 
-    return Instance.start_business_hours()
+    result = Instance.start_business_hours()
+    print (result)
+    if result:
+        return result
+    else:
+        return "No instances meet criteria"
 
 @route('/api/cli/reset')
 def cli_reset():
