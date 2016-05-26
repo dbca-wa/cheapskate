@@ -102,7 +102,7 @@ class Instance:
     def start_business_hours(cls):
         dtstart = dt.strptime(Instance.BUSINESSHOURSTART, "%H:%M")
         dtend = dt.strptime(Instance.BUSINESSHOUREND, "%H:%M")
-        hours = (dtend - dt.now()).seconds / 60 
+        hours = (dtend - dt.now()).seconds / 3600 
 
         if dt.today().weekday() not in Instance.BUSINESSDAYSOFWEEK:
             return False
