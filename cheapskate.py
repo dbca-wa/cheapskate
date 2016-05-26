@@ -113,7 +113,7 @@ class Instance:
 
         results = []
         for instanceid, instance in cls.objects().items():
-            if instance.cheapskate["grp"] != "2" or instance.raw["State"]["Code"] != "80": # Code 80 is stopped
+            if instance.cheapskate["grp"] != "2" or instance.raw["State"]["Code"] != 80: # Code 80 is stopped
                 continue
             results.append(instanceid)
             instance.update(user="Cheapskate", hours=hours, sysstart=1)
