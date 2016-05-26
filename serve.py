@@ -136,7 +136,6 @@ def cli_start_business_hours():
     check_cli_ip("/api/cli/shutdown")
 
     result = Instance.start_business_hours()
-    print (result)
     if result:
         return result
     else:

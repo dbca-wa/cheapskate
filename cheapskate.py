@@ -4,7 +4,6 @@ import json
 from datetime import datetime as dt, timedelta
 from jsonpath_rw import parse
 import uwsgi
-import pickle
 
 
 class Instance:
@@ -104,7 +103,6 @@ class Instance:
         dtstart = dt.strptime(Instance.BUSINESSHOURSTART, "%H:%M")
         dtend = dt.strptime(Instance.BUSINESSHOUREND, "%H:%M")
         hours = (dtend - dt.now()).seconds / 60 
-        print(hours)
 
         if dt.today().weekday() not in Instance.BUSINESSDAYSOFWEEK:
             return False
