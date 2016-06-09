@@ -32,7 +32,8 @@ class Instance:
         self.name = ""
         if "cheapskate" in [a["Key"] for a in self.raw["Tags"]]:
             cheapskate_raw = [a for a in self.raw["Tags"] if a["Key"] == "cheapskate"][0]["Value"].strip()
-            self.cheapskate.update(dict([a.split("=") for a in cheapskate_raw.split("/")]))
+            if cheapskate_raw != "":
+                self.cheapskate.update(dict([a.split("=") for a in cheapskate_raw.split("/")]))
         if "Name" in [a["Key"] for a in self.raw["Tags"]]:
             self.name = [a for a in self.raw["Tags"] if a["Key"] == "Name"][0]["Value"].strip()
         product_key = self.raw["InstanceType"] + "." + self.raw.get("Platform", "linux").title()
@@ -146,10 +147,11 @@ class Instance:
             return False
         elif self.cheapskate["grp"] == "0" or self.cheapskate["grp"] == "2":
             if dt.strptime(self.cheapskate["off"], Instance.DATEFORMAT) < dt.now():
-                print (self.__dict__())
-                result = subprocess.check_output(["aws", "ec2", "stop-instances", "--instance-ids", self.instance_id])
+                result = subprocess.check_output(["aws", "ec2", "stop-instances", "--instance-ids", self.instance_id]).decode('utf-8')
                 self.save()
                 return result
+            else:
+                return json.dumps({"offtime" : self.cheapskate["off"]})
         else:
             return None
 

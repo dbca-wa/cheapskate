@@ -76,7 +76,7 @@ def ec2_instance_update(instance_id):
     return json.dumps(instance.__dict__())
 
 @route('/api/cli/shutdown_check')
-def cli_shudown_check():
+def cli_shutdown_check():
     check_cli_ip("/api/cli/shutdown_check")
 
     with open("shutdown_due.json","w") as shut:
@@ -127,7 +127,7 @@ def cli_shutdown():
         return "No shutdowns required"
 
     for instance in instances:
-        result[instance["id"]] = json.loads(Instance.objects()[instance["id"]].shutdown())
+        result[instance["id"]] = Instance.objects()[instance["id"]].shutdown()
 
     return result
 
