@@ -23,7 +23,7 @@ class Instance:
     COSTTHRESHOLD = 20
     BUSINESSHOURSTART = '06:30'
     BUSINESSHOUREND = '18:30'
-    BUSINESSDAYSOFWEEK = range(0,4) # Monday - Friday (range can be from 0-6)
+    BUSINESSDAYSOFWEEK = range(0,5) # Monday - Friday (values are from 0-6 with monday being 0)
 
     def __init__(self, instance_data):
         self.instance_id = instance_data["InstanceId"]
