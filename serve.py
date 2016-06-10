@@ -11,7 +11,7 @@ from operator import itemgetter
 from cheapskate import Instance
 
 ALLOWED_IPS = ["127.0.0.1"]
-DEBUG = True
+DEBUG = False 
 
 if not os.path.exists("ec2prices_raw.json"):
     priceurl = "https://pricing.us-east-1.amazonaws.com"
@@ -93,7 +93,7 @@ def cli_email_report():
     check_cli_ip("/api/cli/email_report")
 
     FROM = "cheapskate@dpaw.wa.gov.au"
-    TO = "brendan.cale@dpaw.wa.gov.au"
+    TO = "asi@dpaw.wa.gov.au"
     msg = MIMEMultipart('mixed')
 
     msg['Subject'] = "Cheapskate shutdown report"
