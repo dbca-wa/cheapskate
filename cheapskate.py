@@ -155,12 +155,39 @@ class Instance:
         else:
             return None
 
-    def tagInstance(self, tagName, tagValue):
-        return subprocess.check_output(["aws", "ec2", "create-tags", "--resources", self.instance_id, "--tags", "Key={},{}".format(tagName,tagValue)])
+    def tag_instance(self, tagName, tagValue):
+        return subprocess.check_output(["aws", "ec2", "create-tags", "--resources", self.instance_id, "--tags", "Key={},Value={}".format(tagName,tagValue)])
         
 
-    def updateVolumeTags():
-        pass
+    @classmethod
+    def update_volume_tags(cls, tagName):
+        volumes = json.loads(subprocess.check_output(["aws", "ec2", "describe-volumes"]))
+
+        log = {}
+
+        for volume in volumes["Volumes"]:
+            if volume["Attachments"] == []:
+                continue
+
+            volumeTag = ""
+            instanceTag = ""
+
+            volInstanceId = volume["Attachments"][0]["InstanceId"]
+            if "Tags" in volume:
+                for tag in volume["Tags"]:
+                    if tag["Key"] == tagName:
+                        volumeTag = tag["Value"]
+
+            for tag in cls.objects()[volInstanceId].raw["Tags"]:
+                if tag["Key"] == tagName:
+                    instanceTag = tag["Value"]
+
+            if volumeTag == instanceTag:
+                continue
+
+            log[volInstanceId] = subprocess.check_output(["aws", "ec2", "create-tags", "--resources", volume["VolumeId"], "--tags", "Key={},Value={}".format(tagName, instanceTag)])
+
+        return log
 
     def __str__(self):
         return "{} ({})".format(self.raw["InstanceId"], [a for a in self.raw["Tags"] if a["Key"] == "Name"][0]["Value"])

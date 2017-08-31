@@ -153,9 +153,14 @@ def cli_reset():
 
     return "Instances reset"
 
-@route('/api/ec2_instance/<instance_id>/<tag>/<name>')
-def ec2_instance(instance_id):
-    return Instance.objects()[instance_id].tagInstance(tag, name)
+@route('/api/tag/<instance_id>/<tag>/<name>')
+def ec2_tag_instance(instance_id, tag, name):
+    check_cli_ip("/api/tag/")
+    return Instance.objects()[instance_id].tag_instance(tag, name)
 
+@route('/api/tag/volumes/<tagname>')
+def ec2_tag_volumes(tagname):
+    check_cli_ip("/api/tag/")
+    return Instance.update_volume_tags(tagname)
 
 application = default_app()
