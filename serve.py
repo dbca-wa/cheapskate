@@ -111,7 +111,7 @@ def cli_email_report():
         body = body + "{}\t{}\t\t{}\t{}\t{}\n".format(instance["id"], Instance.GROUPS[instance["grp"]], instance["off"], instance["req"], instance["name"])
     msg.attach(MIMEText(body))
 
-    s = smtplib.SMTP('alerts.corporateict.domain')
+    s = smtplib.SMTP('smtp.corporateict.domain')
     s.sendmail(FROM, TO, msg.as_string())
     s.quit()
 
@@ -152,5 +152,10 @@ def cli_reset():
     Instance.save_all()
 
     return "Instances reset"
+
+@route('/api/ec2_instance/<instance_id>/<tag>/<name>')
+def ec2_instance(instance_id):
+    return Instance.objects()[instance_id].tagInstance(tag, name)
+
 
 application = default_app()

@@ -155,6 +155,13 @@ class Instance:
         else:
             return None
 
+    def tagInstance(self, tagName, tagValue):
+        return subprocess.check_output(["aws", "ec2", "create-tags", "--resources", self.instance_id, "--tags", "Key={},{}".format(tagName,tagValue)])
+        
+
+    def updateVolumeTags():
+        pass
+
     def __str__(self):
         return "{} ({})".format(self.raw["InstanceId"], [a for a in self.raw["Tags"] if a["Key"] == "Name"][0]["Value"])
 
