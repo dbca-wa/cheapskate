@@ -65,13 +65,9 @@ class Instance:
                 instance = Instance(instance_data=instance_data)
                 objects[instance.instance_id] = instance
         cls._objects = objects
-        return objects
+        return objects  # A dict
 
-    @classmethod
-    def objects_list(cls):
-        return [i.__dict__() for i in cls.objects().values()]
-
-    def __dict__(self):
+    def as_dict(self):
         data = self.cheapskate
         data["name"] = self.name
         data["id"] = self.instance_id
@@ -80,7 +76,11 @@ class Instance:
         data["launchtime"] = dt.strftime(dt.strptime(self.raw["LaunchTime"], Instance.DATEFORMAT + ":%S.%fZ"), Instance.DATEFORMAT)
         data["hourlycost"] = "%.3f"%float(self.price)
         data["product"] = self.product
-        return data
+        return data  # A dictionary?
+
+    @classmethod
+    def objects_list(cls):
+        return [i.as_dict() for i in cls.objects().values()]
 
     @classmethod
     def save_all(cls):

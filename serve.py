@@ -65,7 +65,7 @@ def ec2_instances():
 
 @route('/api/ec2_instance/<instance_id>')
 def ec2_instance(instance_id):
-    return Instance.objects()[instance_id].__dict__()
+    return Instance.objects()[instance_id].as_dict()
 
 @route('/api/ec2_instance/<instance_id>', method='POST')
 def ec2_instance_update(instance_id):
@@ -73,7 +73,7 @@ def ec2_instance_update(instance_id):
     hours = request.forms.get("hours")
     user = request.headers.get("Remote-User")
     instance.update(user=user, hours=int(hours))
-    return json.dumps(instance.__dict__())
+    return json.dumps(instance.as_dict())
 
 @route('/api/cli/shutdown_check')
 def cli_shutdown_check():
@@ -82,7 +82,7 @@ def cli_shutdown_check():
     with open("shutdown_due.json","w") as shut:
         output = []
         for instanceid, instance in Instance.shutdown_due(hours=3).items():
-            inst = instance.__dict__()
+            inst = instance.as_dict()
             inst.pop("product", None)
             output.append(inst)
         shut.write(json.dumps(output, sort_keys=True, indent=4, separators=(',',': ')))

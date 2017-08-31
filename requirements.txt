@@ -2,4 +2,5 @@ bottle
 requests
 jsonpath-rw
 uwsgi
+gevent
 
