@@ -159,33 +159,26 @@ class Instance:
         return subprocess.check_output(["aws", "ec2", "create-tags", "--resources", self.instance_id, "--tags", "Key={},Value={}".format(tagName,tagValue)])
         
 
-    @classmethod
-    def update_volume_tags(cls, tagName):
-        volumes = json.loads(subprocess.check_output(["aws", "ec2", "describe-volumes"]))
+    def update_volume_tags(self, tagName):
+        volumes = json.loads(subprocess.check_output(["aws", "ec2", "describe-volumes", "--filters", "Name=attachment.instance-id,Values={}".format(self.instance_id)]))
 
         log = {}
+        instanceTag = ""
+        for tag in self.raw["Tags"]:
+            instanceTag = tag["Value"] if (tag["Key"] == tagName) else ""
 
-        for volume in volumes["Volumes"]:
-            if volume["Attachments"] == []:
-                continue
+        for volume in volumes:
+            if self.instance_id not in log[self.instance_id]:
+                log[self.instance_id] = {}
+            log[self.instance_id][volume["VolumeId"]] = subprocess.check_output(["aws", "ec2", "create-tags", "--resources", volume["VolumeId"], "--tags", "Key={},Value={}".format(tagName, instanceTag)])
+            print "Tagged volumes"
 
-            volumeTag = ""
-            instanceTag = ""
+            snapshots = json.loads(subprocess.check_output(["aws", "ec2", "describe-snapshots", "--filters", "Name=tag:Managed,Values=true", "Name=volume-id,Values={}".format(volume["VolumeId"])]))
+            print "Tagged snapshots", len(snapshots["Snapshots"])
+            log[self.instance_id][volume["VolumeId"]]["Snapshots"] = {}
 
-            volInstanceId = volume["Attachments"][0]["InstanceId"]
-            if "Tags" in volume:
-                for tag in volume["Tags"]:
-                    if tag["Key"] == tagName:
-                        volumeTag = tag["Value"]
-
-            for tag in cls.objects()[volInstanceId].raw["Tags"]:
-                if tag["Key"] == tagName:
-                    instanceTag = tag["Value"]
-
-            if volumeTag == instanceTag:
-                continue
-
-            log[volInstanceId] = subprocess.check_output(["aws", "ec2", "create-tags", "--resources", volume["VolumeId"], "--tags", "Key={},Value={}".format(tagName, instanceTag)])
+            for snap in snapshots["Snapshots"]:
+                log[self.instance_id][volume["VolumeId"]]["Snapshots"][snap["SnapshotId"]] = subprocess.check_output(["aws", "ec2", "create-tags", "--resources", snap["SnapshotId"], "--tags", "Key={},Value={}".format(tagName,tagValue)])
 
         return log
 
